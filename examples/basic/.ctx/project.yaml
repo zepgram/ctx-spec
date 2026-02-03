@@ -1,0 +1,42 @@
+# CTX Spec v0.1 - Basic Example
+ctx_version: "0.1"
+
+name: my-nuxt-app
+description: E-commerce storefront built with Nuxt 3
+
+stack:
+  - nuxt3
+  - typescript
+  - pinia
+  - tailwindcss
+  - postgresql
+
+language: typescript
+
+ai_instructions: |
+  ## Code Style
+  - Use Composition API with <script setup lang="ts">
+  - Prefer composables over mixins
+  - Use TypeScript strict mode patterns
+  
+  ## Project Structure
+  - Components in /components (auto-imported)
+  - Composables in /composables (auto-imported)  
+  - API routes in /server/api
+  - Types in /types
+  
+  ## Patterns
+  - All API calls go through /composables/useApi.ts
+  - State management with Pinia stores in /stores
+  - Form validation with vee-validate + zod
+  
+  ## When Unsure
+  - Check existing similar components first
+  - Follow Nuxt 3 conventions over custom patterns
+  - Ask before creating new utilities
+
+key_paths:
+  - composables/    # Shared logic
+  - components/ui/  # Design system
+  - server/api/     # Backend endpoints
+  - stores/         # Pinia stores

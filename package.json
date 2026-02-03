@@ -1,0 +1,32 @@
+{
+  "name": "ctx-spec",
+  "version": "0.1.0",
+  "description": "The .gitignore for AI coding — a simple, open standard for project context",
+  "main": "cli/index.js",
+  "bin": {
+    "ctx": "./cli/index.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ai",
+    "coding",
+    "context",
+    "llm",
+    "claude",
+    "cursor",
+    "copilot",
+    "developer-tools"
+  ],
+  "author": "Benjamin Calef <ben@zepgram.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zepgram/ctx-spec.git"
+  },
+  "homepage": "https://github.com/zepgram/ctx-spec#readme",
+  "bugs": {
+    "url": "https://github.com/zepgram/ctx-spec/issues"
+  }
+}

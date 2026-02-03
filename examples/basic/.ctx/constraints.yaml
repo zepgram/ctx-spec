@@ -1,0 +1,45 @@
+# Constraints - Rules AI must follow
+ctx_version: "0.1"
+
+rules:
+  # TypeScript
+  - All functions must have explicit return types
+  - Use interfaces for object shapes, types for unions/primitives
+  - No implicit any - always type or use unknown
+  
+  # Vue/Nuxt
+  - Components must define Props with TypeScript interface
+  - Use defineEmits with typed events
+  - Prefer computed over methods for derived state
+  
+  # API
+  - All API routes must validate input with zod
+  - Return consistent response shape {data, error}
+  - Handle errors with try/catch, never let them bubble
+
+forbidden:
+  # Security
+  - Never hardcode API keys or secrets
+  - Never trust client-side input without validation
+  - Never expose internal IDs in URLs (use slugs or UUIDs)
+  
+  # Code Quality  
+  - No console.log in committed code (use logger)
+  - No // @ts-ignore without explanation comment
+  - No default exports (use named exports)
+  
+  # Performance
+  - No synchronous operations in components
+  - No blocking the main thread > 50ms
+
+performance:
+  - LCP target: < 2.5s
+  - FCP target: < 1.8s  
+  - Bundle size: < 200kb initial JS
+  - No layout shift (CLS < 0.1)
+
+security:
+  - All forms must have CSRF protection
+  - All file uploads must validate type and size
+  - User sessions expire after 24h inactivity
+  - PII must be encrypted in database
