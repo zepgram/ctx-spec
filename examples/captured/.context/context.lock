@@ -1,0 +1,40 @@
+ctx_version: "0.1"
+generated: "2026-02-03T16:00:00Z"
+hash: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+project:
+  name: "example-app"
+  description: "Example application with captured context"
+  stack: ["typescript", "express", "postgresql", "redis"]
+  language: "typescript"
+
+stats:
+  total_interactions: 3
+  first_interaction: "2026-02-03T14:32:00Z"
+  last_interaction: "2026-02-03T15:10:00Z"
+  decisions_count: 1
+  constraints_count: 0
+  glossary_terms: 0
+
+semantic_index:
+  - concept: "authentication"
+    summary: "JWT + session-based auth with Redis cache"
+    confidence: 0.90
+    files:
+      - "src/auth/**"
+      - "src/middleware/auth.ts"
+    decisions: ["ADR-001"]
+    recent_intents: ["int_001", "int_002", "int_003"]
+    
+  - concept: "caching"
+    summary: "Redis for session caching, write-through pattern"
+    confidence: 0.92
+    files:
+      - "src/config/redis.ts"
+      - "src/auth/session.ts"
+    decisions: ["ADR-001"]
+    recent_intents: ["int_001", "int_002"]
+
+constraints: []
+
+glossary: {}

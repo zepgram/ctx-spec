@@ -1,294 +1,521 @@
-# CTX Spec v0.1
+# Context Daemon Specification v0.1
 
-> Context Infrastructure for AI Coding
+> Automatic context capture for AI-assisted development
 
 ## Overview
 
-CTX Spec defines a standard directory structure (`.ctx/`) that AI coding tools can read to understand project context. It's designed to be:
+Context Daemon (`ctxd`) is a background service that captures the intent behind AI-assisted code changes. It creates a `.context/` directory that serves as the "memory" of why code exists.
 
-- **Simple** — Plain YAML/Markdown files
-- **Portable** — Any tool can implement it
-- **Git-native** — Versioned with your code
-- **Incremental** — Start with one file, add more as needed
+## Core Principles
+
+1. **Invisible capture** — Zero workflow change for developers
+2. **Explicit reading** — Context is always human-inspectable
+3. **Portable** — Clone repo = clone understanding
+4. **Privacy-first** — All data local by default
 
 ## Directory Structure
 
 ```
-.ctx/
-├── project.yaml       # [REQUIRED] Project metadata
-├── constraints.yaml   # Rules and boundaries
-├── architecture.md    # System design
-├── glossary.yaml      # Domain terminology
-├── intent.md          # Current focus
-└── modules/           # Per-module context (optional)
-    ├── checkout.yaml
-    └── inventory.yaml
+.context/
+├── daemon.yaml          # Daemon configuration
+├── intent-log.jsonl     # All AI interactions (append-only)
+├── context.lock         # Semantic snapshot
+├── project.yaml         # Project config (auto-detected + manual)
+├── constraints.yaml     # Rules and boundaries
+├── glossary.yaml        # Domain terminology
+└── decisions/           # Auto-generated ADRs
+    ├── ADR-001.md
+    ├── ADR-002.md
+    └── ...
 ```
 
 ## File Specifications
 
-### project.yaml (Required)
+### intent-log.jsonl
 
-The only required file. Contains project metadata and basic AI instructions.
+Append-only log of AI interactions. One JSON object per line.
+
+```jsonl
+{
+  "id": "int_001",
+  "ts": "2026-02-03T14:32:00Z",
+  "tool": "claude-code",
+  "session": "sess_abc123",
+  "prompt": "Add Redis cache for user sessions, we have perf issues at 10k users",
+  "files": ["src/auth/session.ts", "src/config/redis.ts"],
+  "diff_hash": "a3f2c1d",
+  "intent": {
+    "category": "performance",
+    "confidence": 0.92,
+    "problem": "scaling bottleneck at 10k concurrent users",
+    "solution": "Redis session cache",
+    "alternatives": ["memcached", "in-memory LRU"],
+    "concepts": ["caching", "sessions", "scalability"]
+  },
+  "commit": "a1b2c3d",
+  "commit_msg": "feat: add redis session cache",
+  "adr_generated": "ADR-003"
+}
+```
+
+**Fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | ✅ | Unique identifier (int_XXX) |
+| `ts` | ISO 8601 | ✅ | Timestamp |
+| `tool` | string | ✅ | AI tool used |
+| `session` | string | ❌ | Tool session ID |
+| `prompt` | string | ✅ | User's prompt/request |
+| `files` | string[] | ✅ | Files modified |
+| `diff_hash` | string | ❌ | Hash of the diff |
+| `intent` | object | ✅ | Inferred intent (see below) |
+| `commit` | string | ❌ | Git commit SHA |
+| `commit_msg` | string | ❌ | Commit message |
+| `adr_generated` | string | ❌ | ADR ID if generated |
+
+**Intent object:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `category` | enum | feature, bugfix, refactor, performance, security, docs, test |
+| `confidence` | number | 0-1 confidence score |
+| `problem` | string | Problem being solved |
+| `solution` | string | Solution implemented |
+| `alternatives` | string[] | Alternatives considered |
+| `concepts` | string[] | Related concepts |
+
+### context.lock
+
+Semantic snapshot of project understanding. Updated periodically.
 
 ```yaml
-# CTX Spec version
 ctx_version: "0.1"
+generated: "2026-02-03T15:00:00Z"
+hash: "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 
-# Project info
-name: "my-project"
-description: "Short description of the project"
+project:
+  name: "my-ecommerce"
+  description: "E-commerce platform on Nuxt 3"
+  stack: ["nuxt3", "typescript", "postgresql", "redis"]
+  language: "typescript"
 
-# Tech stack (helps AI understand the ecosystem)
+stats:
+  total_interactions: 156
+  first_interaction: "2026-01-15T10:00:00Z"
+  last_interaction: "2026-02-03T14:45:00Z"
+  decisions_count: 12
+  constraints_count: 5
+  glossary_terms: 23
+
+# Semantic index for AI consumption
+semantic_index:
+  - concept: "authentication"
+    summary: "JWT-based auth with Redis session cache"
+    confidence: 0.95
+    files:
+      - "src/auth/**"
+      - "src/middleware/auth.ts"
+    decisions: ["ADR-001", "ADR-003"]
+    recent_intents: ["int_001", "int_015"]
+    
+  - concept: "payments"
+    summary: "Stripe integration with webhook handlers"
+    confidence: 0.88
+    files:
+      - "src/billing/**"
+    decisions: ["ADR-002"]
+    constraints: ["PCI-DSS compliance"]
+    glossary_terms: ["AOV", "chargeback"]
+
+# Active constraints
+constraints:
+  - id: "perf-001"
+    rule: "LCP must stay under 2.5s"
+    source: "manual"  # or "inferred"
+    
+  - id: "sec-001"
+    rule: "All user input must be sanitized"
+    source: "inferred"
+    from_intent: "int_045"
+
+# Glossary snapshot (most used terms)
+glossary:
+  SKU: "Stock Keeping Unit - unique product identifier"
+  AOV: "Average Order Value"
+  LCP: "Largest Contentful Paint"
+```
+
+### decisions/ADR-XXX.md
+
+Auto-generated Architecture Decision Records.
+
+```markdown
+# ADR-003: Redis for Session Cache
+
+**ID**: ADR-003
+**Date**: 2026-02-03
+**Status**: Accepted
+**Source**: Auto-generated from int_001
+**Confidence**: 0.92
+
+## Context
+
+Performance bottleneck observed with 10k concurrent users. Session lookups
+were hitting the database on every request, causing ~50ms latency.
+
+Original prompt:
+> "Add Redis cache for user sessions, we have perf issues at 10k users"
+
+## Decision
+
+Implement Redis as a session cache layer between the application and database.
+
+## Alternatives Considered
+
+| Alternative | Reason Rejected |
+|------------|-----------------|
+| Memcached | No persistence, fewer data structures |
+| In-memory LRU | Doesn't scale horizontally across instances |
+
+## Implementation
+
+Files modified:
+- `src/auth/session.ts` - Session middleware with Redis lookup
+- `src/config/redis.ts` - Redis connection configuration
+
+## Consequences
+
+### Positive
+- Session lookups reduced from ~50ms to ~2ms
+- Database load significantly reduced
+
+### Negative
+- New infrastructure dependency (Redis)
+- Need to handle connection failures gracefully
+- Additional operational complexity
+
+## Related
+
+- **Intents**: int_001, int_002 (connection pool fix)
+- **Commits**: a1b2c3d, b2c3d4e
+- **Concepts**: caching, sessions, performance, scalability
+```
+
+### project.yaml
+
+Project configuration. Auto-detected with manual overrides.
+
+```yaml
+ctx_version: "0.1"
+auto_detected: true
+last_scan: "2026-02-03T15:00:00Z"
+
+# Auto-detected
+name: "my-ecommerce"
+description: "E-commerce platform"  # From package.json
 stack:
-  - nuxt3
-  - typescript
-  - postgresql
-  - redis
+  - nuxt3        # Detected from package.json
+  - typescript   # Detected from tsconfig.json
+  - postgresql   # Detected from .env
+  - redis        # Detected from config
 
-# Primary language
 language: typescript
+package_manager: pnpm  # Detected from lockfile
 
-# AI-specific instructions (injected into system prompt)
-ai_instructions: |
-  - Use Composition API with <script setup>
-  - All API calls go through /src/api/client.ts
-  - Follow existing patterns before inventing new ones
-  - When unsure, check /docs/ first
+structure:
+  src: "Source code"
+  src/api: "API routes"
+  src/components: "Vue components"
+  src/composables: "Shared composables"
 
-# Optional: paths AI should always be aware of
-key_paths:
-  - src/api/          # API layer
-  - src/composables/  # Shared logic
-  - src/types/        # Type definitions
+# Manual overrides (human-editable)
+overrides:
+  ai_instructions: |
+    - Follow existing patterns in composables/
+    - All API calls go through src/api/client.ts
+    - Use Pinia for state management
+    
+  key_files:
+    - src/api/client.ts    # API abstraction
+    - src/types/index.ts   # Shared types
 ```
 
 ### constraints.yaml
 
-Hard rules the AI must follow. These are non-negotiable.
+Rules the AI must follow. Mix of inferred and manual.
 
 ```yaml
-# Things AI must always do
-rules:
-  - All functions must have TypeScript return types
-  - Use named exports, not default exports
-  - Components must have Props interface defined
-  - API errors must be handled with try/catch
+ctx_version: "0.1"
 
-# Things AI must never do
+# Inferred from intent history
+inferred:
+  - id: "inf-001"
+    rule: "Use TypeScript strict mode"
+    confidence: 0.95
+    from_intents: ["int_012", "int_034"]
+    
+  - id: "inf-002"
+    rule: "API errors must return consistent shape"
+    confidence: 0.88
+    from_intents: ["int_056"]
+
+# Manually specified
+manual:
+  - id: "man-001"
+    rule: "Never commit secrets or API keys"
+    severity: critical
+    
+  - id: "man-002"
+    rule: "All components must have TypeScript props"
+    severity: warning
+    
+  - id: "man-003"
+    rule: "LCP must stay under 2.5s"
+    severity: error
+    metric: true
+
+# Forbidden patterns
 forbidden:
-  - Never use `any` type without explicit comment
-  - Never commit console.log in production code
-  - Never access database directly from components
-  - Never hardcode secrets or API keys
-
-# Performance constraints
-performance:
-  - LCP must stay under 3 seconds
-  - Bundle size must stay under 200kb
-  - No synchronous operations in render path
-
-# Security constraints  
-security:
-  - All user input must be sanitized
-  - All API routes require authentication (except /public/*)
-  - PII must be encrypted at rest
-```
-
-### architecture.md
-
-Human-readable system design. Markdown format for flexibility.
-
-```markdown
-# Architecture
-
-## Overview
-E-commerce platform built on Nuxt 3 with headless CMS backend.
-
-## Modules
-
-### Checkout (`/src/modules/checkout/`)
-Handles cart → payment → order flow.
-- Owner: payments-team
-- Dependencies: inventory, pricing
-- ⚠️ Legacy v1 API still used by mobile app
-
-### Inventory (`/src/modules/inventory/`)
-Stock management and availability.
-- Owner: platform-team
-- Real-time sync with warehouse system
-
-## Data Flow
-```
-User → Nuxt App → API Gateway → Microservices → PostgreSQL
-                              → Redis (cache)
-                              → Stripe (payments)
-```
-
-## Key Decisions
-- **Why Nuxt 3?** SSR for SEO, Vue ecosystem familiarity
-- **Why PostgreSQL?** ACID compliance for transactions
-- **Why separate modules?** Team ownership boundaries
+  - pattern: "console.log"
+    context: "production code"
+    
+  - pattern: "any"
+    context: "without explicit comment"
+    
+  - pattern: "@ts-ignore"
+    context: "without explanation"
 ```
 
 ### glossary.yaml
 
-Domain-specific terms. Helps AI understand business context.
+Domain terminology. Auto-learned and manually extended.
 
 ```yaml
-terms:
+ctx_version: "0.1"
+
+# Auto-learned from prompts/code
+learned:
   SKU:
-    definition: Stock Keeping Unit - unique product identifier
-    example: "ZV-DRESS-BLK-M"
+    definition: "Stock Keeping Unit - unique product identifier"
+    confidence: 0.95
+    first_seen: "int_023"
+    occurrences: 45
     
+  backorder:
+    definition: "Order placed for out-of-stock items"
+    confidence: 0.82
+    first_seen: "int_067"
+    occurrences: 12
+
+# Manually defined
+manual:
   AOV:
-    definition: Average Order Value
-    formula: total_revenue / number_of_orders
-    context: Key metric for marketing team
-    
-  Click & Collect:
-    definition: Buy online, pickup in store
-    aliases: [BOPIS, C&C]
+    definition: "Average Order Value"
+    formula: "total_revenue / number_of_orders"
+    context: "Key metric for marketing team"
     
   Flash Sale:
-    definition: Time-limited discount event
-    constraints: 
-      - Max 48h duration
-      - Requires inventory lock
-      - Needs marketing approval
+    definition: "Time-limited discount event"
+    constraints:
+      - "Max 72h duration"
+      - "Requires inventory lock"
 ```
 
-### intent.md
+### daemon.yaml
 
-Current working context. Updated frequently.
-
-```markdown
-# Current Intent
-
-## Active Focus
-Optimizing checkout page performance. Target: LCP < 2.5s
-
-## Recent Context
-- Just finished payment provider migration (Stripe → Adyen)
-- Cart component was refactored last week
-- Known issue: slow inventory check on large carts
-
-## Blocked On
-- Waiting for design review on new progress indicator
-- Need API team to expose batch inventory endpoint
-
-## Next Up
-- [ ] Lazy load payment form
-- [ ] Implement skeleton loaders
-- [ ] Add performance monitoring
-```
-
-### modules/*.yaml (Optional)
-
-Per-module context for larger projects.
+Daemon configuration.
 
 ```yaml
-# .ctx/modules/checkout.yaml
-name: checkout
-path: src/modules/checkout
-owner: payments-team
-description: Handles cart → payment → order flow
+ctx_version: "0.1"
 
-dependencies:
-  - inventory  # Stock checks
-  - pricing    # Discounts, taxes
+# Capture settings
+capture:
+  enabled: true
+  
+  tools:
+    claude-code:
+      enabled: true
+      log_path: "~/.claude/logs"
+      
+    cursor:
+      enabled: true
+      method: "extension"  # or "logs"
+      
+    copilot:
+      enabled: false
+      
+  # Generic clipboard capture (opt-in)
+  clipboard:
+    enabled: false
+    
+  # File patterns to ignore
+  ignore:
+    - ".env*"
+    - "*.pem"
+    - "*.key"
+    - "node_modules/**"
 
-exposes:
-  - POST /api/checkout/create
-  - POST /api/checkout/complete
-  - GET /api/checkout/:id
+# Intent inference
+inference:
+  provider: "local"  # "local", "anthropic", "openai"
+  model: "llama3.2"  # For local provider
+  
+  # API provider settings (if not local)
+  # api_key: "env:ANTHROPIC_API_KEY"
+  
+  # Confidence threshold for logging
+  min_confidence: 0.5
 
-consumes:
-  - inventory.checkStock()
-  - pricing.calculateTotal()
+# ADR generation
+adr:
+  auto_generate: true
+  threshold: 0.8  # Min confidence to generate
+  require_review: false  # Mark as draft if true
 
-pitfalls:
-  - Legacy v1 API at /src/legacy/ still serves mobile app
-  - Test mode hits real Stripe sandbox (charges appear then void)
-  - Cart expiry is 30 minutes, not configurable yet
+# Lock file
+lock:
+  update_frequency: "1h"  # or "on-commit", "manual"
+  include_full_index: true
+
+# Privacy
+privacy:
+  redact_patterns:
+    - "api[_-]?key"
+    - "secret"
+    - "password"
+    - "token"
+    - "bearer\\s+\\S+"
 ```
 
-## AI Tool Integration
+## CLI Specification
 
-### Detection
+### Daemon Commands
 
-Tools should check for `.ctx/` directory at:
-1. Repository root
-2. Current working directory
-3. Parent directories (up to git root)
+```bash
+# Start daemon in background
+ctxd start [--foreground]
 
-### Loading Priority
+# Stop daemon
+ctxd stop
 
-1. `project.yaml` (always load)
-2. `constraints.yaml` (always load if exists)
-3. `intent.md` (load if recent, < 7 days old)
-4. `architecture.md` (load on first session or when requested)
-5. `glossary.yaml` (load when domain terms appear)
-6. `modules/*.yaml` (load relevant modules based on file context)
+# Restart daemon
+ctxd restart
 
-### Context Injection
+# Check status
+ctxd status
 
-Recommended approach:
+# View daemon logs
+ctxd logs [--follow]
+```
+
+### Context Commands
+
+```bash
+# Initialize .context/ in current repo
+ctx init
+
+# View intent log
+ctx log [--since <duration>] [--limit <n>] [--tool <name>]
+
+# View specific intent
+ctx show <intent-id>
+
+# List decisions/ADRs
+ctx decisions [--status <accepted|draft|superseded>]
+
+# View specific ADR
+ctx adr <adr-id>
+
+# Ask why something exists
+ctx why <file-or-path>
+
+# Search context
+ctx search <query>
+```
+
+### Management Commands
+
+```bash
+# Update context.lock
+ctx lock [--force]
+
+# Export for AI consumption
+ctx export [--format <md|json|yaml>] [--output <file>]
+
+# Validate .context/ structure
+ctx validate
+
+# Clean old entries
+ctx clean [--before <date>] [--dry-run]
+
+# Redact sensitive entry
+ctx redact <intent-id> [--field <field>]
+
+# Pause capture temporarily
+ctx pause [--until <duration>]
+ctx resume
+```
+
+### Migration Commands
+
+```bash
+# Import from other formats
+ctx migrate --from cursor    # .cursorrules
+ctx migrate --from claude    # CLAUDE.md, AGENTS.md
+ctx migrate --from adr       # Existing ADR directory
+```
+
+## AI Tool Integration Protocol
+
+### Reading Context
+
+AI tools should:
+
+1. **Detect** `.context/` at repo root
+2. **Load** `context.lock` for semantic overview
+3. **Load** relevant `decisions/` based on files being edited
+4. **Respect** `constraints.yaml` as hard rules
+5. **Reference** `glossary.yaml` for domain terms
+
+### Recommended Context Injection
 
 ```
 System prompt:
-- Include project.yaml ai_instructions
-- Include constraints as "RULES YOU MUST FOLLOW"
-- Include relevant module context based on files being edited
+├── project.yaml → ai_instructions
+├── constraints.yaml → "RULES YOU MUST FOLLOW"
+└── context.lock → semantic_index (relevant concepts)
 
-User context:
-- Include intent.md as "CURRENT FOCUS"
-- Include glossary terms when domain language appears
+Per-request:
+├── Relevant ADRs based on files
+├── Glossary terms that appear in conversation
+└── Recent related intents (optional)
 ```
 
-### Respecting Constraints
+### Writing Context (Optional)
 
-Constraints in `constraints.yaml` should be treated as hard rules:
-- `rules` → Must always follow
-- `forbidden` → Must never do
-- `performance` → Warn if likely to violate
-- `security` → Block if violating
+AI tools MAY write to `.context/` if they support it:
 
-## Migration
-
-### From .cursorrules
-
-```bash
-ctx migrate --from cursor
-```
-
-Converts `.cursorrules` content into `.ctx/project.yaml` ai_instructions.
-
-### From CLAUDE.md / AGENTS.md
-
-```bash
-ctx migrate --from claude
-```
-
-Parses existing markdown files and distributes into appropriate `.ctx/` files.
+1. **Append** to `intent-log.jsonl` with tool identifier
+2. **Never modify** existing entries
+3. **Follow** the schema exactly
 
 ## Versioning
 
-The spec follows semver:
-- `0.x` — Experimental, breaking changes possible
-- `1.x` — Stable, backwards compatible
-- `2.x` — Breaking changes, migration guide provided
+- Spec version in `ctx_version` field
+- Files without version assumed v0.1
+- Breaking changes increment minor version in 0.x
+- Stable release will be 1.0
 
-Files include `ctx_version` to indicate which spec version they follow.
+## Privacy Considerations
 
-## Future Considerations (v0.2+)
-
-- **Intent log**: Append-only log of intent → code changes
-- **Remote sync**: Team-shared context (CTX Cloud)
-- **Hooks**: Events for context changes
-- **Inheritance**: Org-level defaults + project overrides
+1. **Local-first**: All data in `.context/` stays local
+2. **Gitignore option**: Can ignore `intent-log.jsonl` if sensitive
+3. **Redaction**: Built-in patterns for secrets, manual redaction available
+4. **Pause/resume**: Temporarily disable capture
+5. **No telemetry**: Daemon never phones home
 
 ---
 
-*CTX Spec v0.1 — Draft*
+*Context Daemon Specification v0.1 — Draft*
 *Last updated: 2026-02-03*

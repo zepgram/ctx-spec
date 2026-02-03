@@ -1,0 +1,23 @@
+{
+  "name": "context-daemon",
+  "version": "0.1.0",
+  "description": "Automatic context capture for AI-assisted development",
+  "main": "dist/index.js",
+  "bin": {
+    "ctxd": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js start",
+    "dev": "ts-node src/index.ts start"
+  },
+  "dependencies": {
+    "chokidar": "^3.5.3",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.0"
+  }
+}
